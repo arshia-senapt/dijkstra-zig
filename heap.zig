@@ -13,7 +13,7 @@ pub const Heap = struct {
 
 var gHeap: ?*Heap = null;
 
-pub fn createHeap(allocator: *std.mem.Allocator, maxNodes: usize) !void {
+pub fn createHeap(allocator: *const std.mem.Allocator, maxNodes: usize) !void {
     const heap = try allocator.create(Heap);
     const nodes = try allocator.alloc(HeapNode, @intCast(maxNodes + 1));
     heap.* = Heap{
@@ -24,7 +24,7 @@ pub fn createHeap(allocator: *std.mem.Allocator, maxNodes: usize) !void {
     gHeap = heap;
 }
 
-pub fn destroyHeap(allocator: *std.mem.Allocator) void {
+pub fn destroyHeap(allocator: *const std.mem.Allocator) void {
     if (gHeap != null) {
         allocator.free(gHeap.?.nodes);
         allocator.destroy(gHeap.?);
