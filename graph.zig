@@ -9,71 +9,81 @@ pub const ChildNode = struct {
 pub const GraphNode = struct {
     name: []const u8,
     children: ?*ChildNode = null,
-    visted: bool,
+    visited: bool,
     distanceFromStart: usize,
     pathVia: usize,
+    isInHeap: bool,
+
+    pub fn deinit(self: *GraphNode, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        var child = self.children;
+        while (child) |c| {
+            const next = c.next;
+            allocator.destroy(c);
+            child = next;
+        }
+        self.children = null;
+    }
 };
 
 pub const Graph = struct {
     maxSize: usize,
     nodes: []GraphNode,
-};
+    allocator: std.mem.Allocator,
 
-var gGraph: ?*Graph = null;
-
-pub fn initialiseGraph(allocator: *const std.mem.Allocator, maxSize: usize) !void {
-    const graph = try allocator.create(Graph);
-    const nodes = try allocator.alloc(GraphNode, @intCast(maxSize + 1));
-    graph.* = Graph{
-        .maxSize = maxSize,
-        .nodes = nodes,
-    };
-    gGraph = graph;
-}
-
-pub fn destroyGraph(allocator: *const std.mem.Allocator) void {
-    if (gGraph != null) {
-        allocator.free(gGraph.?.nodes);
-        allocator.free(gGraph.?);
-        gGraph = null;
+    pub fn init(allocator: std.mem.Allocator, maxSize: usize) !Graph {
+        const nodes = try allocator.alloc(GraphNode, @intCast(maxSize + 1));
+        return .{
+            .maxSize = maxSize,
+            .nodes = nodes,
+            .allocator = allocator,
+        };
     }
-}
 
-pub fn insertGraphNode(index: usize, name: []const u8) !void {
-    const graph = gGraph orelse return error.UninitializedGraph;
-    graph.nodes[index] = GraphNode{
-        .name = name,
-        .children = null,
-        .visted = false,
-        .distanceFromStart = std.math.maxInt(usize),
-        .pathVia = 0,
-    };
-}
-
-pub fn insertGraphLink(allocator: *const std.mem.Allocator, source: usize, target: usize, distance: usize) !void {
-    const graph = gGraph orelse return error.UninitializedGraph;
-    const newChild = try allocator.create(ChildNode);
-    newChild.* = ChildNode{
-        .index = target,
-        .distance = distance,
-        .next = graph.nodes[source].children,
-    };
-    graph.nodes[source].children = newChild;
-}
-
-pub fn printGraph(stdout: anytype) !void {
-    const graph = gGraph orelse return error.UninitializedGraph;
-
-    var i: usize = 1;
-    while (i <= graph.maxSize) : (i += 1) {
-        const node = &graph.nodes[i];
-        try stdout.print("Node {d}: {s}\n", .{ i, node.name });
-
-        var child = node.children;
-        while (child) |c| {
-            try stdout.print("  -> {d} (distance: {d})\n", .{ c.index, c.distance });
-            child = c.next;
+    pub fn deinit(self: *Graph) void {
+        defer self.allocator.free(self.nodes);
+        for (self.nodes) |*node| {
+            node.deinit(self.allocator);
         }
     }
-}
+
+    pub fn insertGraphNode(self: *Graph, index: usize, name: []const u8) !void {
+        self.nodes[index] = GraphNode{
+            .name = try self.allocator.dupe(u8, name),
+            .children = null,
+            .visited = false,
+            .distanceFromStart = std.math.maxInt(usize),
+            .pathVia = 0,
+            .isInHeap = false,
+        };
+    }
+
+    pub fn insertGraphLink(self: *Graph, source: usize, target: usize, distance: usize) !void {
+        const newChild = try self.allocator.create(ChildNode);
+        newChild.* = ChildNode{
+            .index = target,
+            .distance = distance,
+            .next = self.nodes[source].children,
+        };
+        self.nodes[source].children = newChild;
+    }
+
+    pub fn format(self: *const Graph, comptime fmt: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        if (fmt.len != 0) {
+            std.fmt.invalidFmtError(fmt, self);
+        }
+
+        var i: usize = 1;
+        while (i <= self.maxSize) : (i += 1) {
+            const node = self.nodes[i];
+            try writer.print("Node {d}: {s}\n", .{ i, node.name });
+
+            var child = node.children;
+            while (child) |c| {
+                try writer.print("  -> {d} (distance: {d})\n", .{ c.index, c.distance });
+                child = c.next;
+            }
+        }
+    }
+};
 
