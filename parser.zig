@@ -9,30 +9,49 @@ pub fn parseGraphFromFile(allocator: std.mem.Allocator, filename: []const u8) !?
     var buffered = std.io.bufferedReader(reader);
     var lineStream = buffered.reader();
 
-    var buffer: [256]u8 = undefined;
-    var myGraph: ?graph.Graph = null;
+    var lineBuffer: [256]u8 = undefined;
+    var graphOpt: ?graph.Graph = null;
 
-    while (try lineStream.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-        const trimmed = std.mem.trim(u8, line, " \t\r\n");
+    while (true) {
+        const line = try lineStream.readUntilDelimiterOrEof(&lineBuffer, '\n');
+        if (line == null) break;
+
+        const trimmed = std.mem.trim(u8, line.?, " \t\r\n");
+        if (trimmed.len == 0) continue;
+
         if (std.mem.startsWith(u8, trimmed, "MAX")) {
             var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
             _ = it.next();
-            const maxSize = try std.fmt.parseInt(usize, it.next().?, 10);
-            myGraph = try graph.Graph.init(allocator, maxSize);
+            const maxSizeStr = it.next() orelse return error.InvalidFormat;
+            const maxSize = try std.fmt.parseInt(usize, maxSizeStr, 10);
+            graphOpt = try graph.Graph.init(allocator, maxSize);
+
         } else if (std.mem.startsWith(u8, trimmed, "NODE")) {
+            if (graphOpt == null) return error.GraphNotInitialized;
+
             var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
             _ = it.next();
-            const index = try std.fmt.parseInt(usize, it.next().?, 10);
-            const name = it.next().?;
-            try myGraph.?.insertGraphNode(index, name);
+            const indexStr = it.next() orelse return error.InvalidFormat;
+            const index = try std.fmt.parseInt(usize, indexStr, 10);
+            const name = it.next() orelse return error.InvalidFormat;
+            try graphOpt.?.insertGraphNode(index, name);
+
         } else if (std.mem.startsWith(u8, trimmed, "EDGE")) {
+            if (graphOpt == null) return error.GraphNotInitialized;
+
             var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
             _ = it.next();
-            const source = try std.fmt.parseInt(usize, it.next().?, 10);
-            const target = try std.fmt.parseInt(usize, it.next().?, 10);
-            const distance = try std.fmt.parseInt(usize, it.next().?, 10);
-            try myGraph.?.insertGraphLink(source, target, distance);
+            const sourceStr = it.next() orelse return error.InvalidFormat;
+            const targetStr = it.next() orelse return error.InvalidFormat;
+            const distanceStr = it.next() orelse return error.InvalidFormat;
+
+            const source = try std.fmt.parseInt(usize, sourceStr, 10);
+            const target = try std.fmt.parseInt(usize, targetStr, 10);
+            const distance = try std.fmt.parseInt(usize, distanceStr, 10);
+
+            try graphOpt.?.insertGraphLink(source, target, distance);
         }
     }
-    return myGraph;
+
+    return graphOpt;
 }
