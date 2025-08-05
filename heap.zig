@@ -11,7 +11,7 @@ pub const Heap = struct {
     nodes: []HeapNode,
 };
 
-var gHeap: ?*Heap = null;
+pub var gHeap: ?*Heap = null;
 
 pub fn createHeap(allocator: *const std.mem.Allocator, maxNodes: usize) !void {
     const heap = try allocator.create(Heap);
