@@ -12,6 +12,7 @@ pub const GraphNode = struct {
     visited: bool,
     distanceFromStart: usize,
     pathVia: usize,
+    isInHeap: bool,
 
     pub fn deinit(self: *GraphNode, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -53,6 +54,7 @@ pub const Graph = struct {
             .visited = false,
             .distanceFromStart = std.math.maxInt(usize),
             .pathVia = 0,
+            .isInHeap = false,
         };
     }
 
