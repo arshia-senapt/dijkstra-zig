@@ -95,6 +95,38 @@ pub const Heap = struct {
         }
     }
 
+    pub fn decreasePriority(self: *Heap, index: usize, newPriority: usize) !void {
+        var pos: usize = 0;
+
+        for (1..self.totalNodes + 1) |i| {
+            if (self.nodes[i].index == index) {
+                pos = i;
+                break;
+            }
+        }
+
+        if (pos == 0) return error.NodeNotInHeap;
+
+        if (newPriority >= self.nodes[pos].priority) return error.InvalidPriorityDecrease;
+
+        self.nodes[pos].priority = newPriority;
+
+        var currentIndex = pos;
+        var parentIndex = currentIndex / 2;
+
+        while (parentIndex != 0 and
+            self.nodes[parentIndex].priority > self.nodes[currentIndex].priority)
+        {
+            const temp = self.nodes[currentIndex];
+            self.nodes[currentIndex] = self.nodes[parentIndex];
+            self.nodes[parentIndex] = temp;
+
+            currentIndex = parentIndex;
+            parentIndex = currentIndex / 2;
+        }
+    }
+
+
     pub fn print(self: *Heap) void {
         if (self.totalNodes == 0) {
             std.debug.print("Heap is empty\n", .{});

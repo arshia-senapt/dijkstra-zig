@@ -14,4 +14,6 @@ pub fn main() !void {
 
     try dijkstra.dijkstra(myGraph,1, 20);
 
+    //TODO deinit graph after everything is done
+
 }
