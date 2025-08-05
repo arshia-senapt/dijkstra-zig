@@ -9,6 +9,7 @@ pub const Heap = struct {
     totalNodes: usize,
     maxNodes: usize,
     nodes: []HeapNode,
+    index_map: []usize,
     allocator: *std.mem.Allocator,
 
     pub fn init(allocator: *std.mem.Allocator, maxNodes: usize) !Heap {
@@ -16,12 +17,14 @@ pub const Heap = struct {
             .totalNodes = 0,
             .maxNodes = maxNodes,
             .nodes = try allocator.alloc(HeapNode, maxNodes + 1),
+            .index_map = try allocator.alloc(usize, maxNodes + 1),
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Heap) void {
         self.allocator.free(self.nodes);
+        self.allocator.free(self.index_map);
     }
 
     pub fn addNode(self: *Heap, index: usize, priority: usize) !void {
@@ -32,6 +35,7 @@ pub const Heap = struct {
             .index = index,
             .priority = priority,
         };
+        self.index_map[index] = self.totalNodes;
         try self.upheap();
     }
 
@@ -39,20 +43,19 @@ pub const Heap = struct {
         const temp = self.nodes[i];
         self.nodes[i] = self.nodes[j];
         self.nodes[j] = temp;
+
+        self.index_map[self.nodes[i].index] = i;
+        self.index_map[self.nodes[j].index] = j;
     }
 
     fn upheap(self: *Heap) !void {
-        if (self.totalNodes <= 1) return;
-
         var currentIndex = self.totalNodes;
-        var parentIndex = currentIndex / 2;
+        while (currentIndex > 1) {
+            const parentIndex = currentIndex / 2;
+            if (self.nodes[parentIndex].priority <= self.nodes[currentIndex].priority) break;
 
-        while (parentIndex != 0 and
-            self.nodes[parentIndex].priority > self.nodes[currentIndex].priority)
-        {
             self.swapNodes(currentIndex, parentIndex);
             currentIndex = parentIndex;
-            parentIndex = currentIndex / 2;
         }
     }
 
@@ -60,33 +63,32 @@ pub const Heap = struct {
         if (self.totalNodes == 0) return error.HeapEmpty;
 
         const rootNode = self.nodes[1];
-        self.nodes[1] = self.nodes[self.totalNodes];
-        self.totalNodes -= 1;
+        self.index_map[rootNode.index] = 0;
 
-        try self.downheap();
+        self.nodes[1] = self.nodes[self.totalNodes];
+        self.index_map[self.nodes[1].index] = 1;
+
+        self.totalNodes -= 1;
+        try self.downheap(1);
 
         return rootNode;
     }
 
-    fn downheap(self: *Heap) !void {
-        var currentIndex: usize = 1;
+    fn downheap(self: *Heap, startIndex: usize) !void {
+        var currentIndex = startIndex;
 
         while (true) {
             const left = currentIndex * 2;
             const right = left + 1;
             var smallest = currentIndex;
 
-            if (left <= self.totalNodes and
-                self.nodes[left].priority < self.nodes[smallest].priority)
-                {
-                    smallest = left;
-                }
+            if (left <= self.totalNodes and self.nodes[left].priority < self.nodes[smallest].priority) {
+                smallest = left;
+            }
 
-            if (right <= self.totalNodes and
-                self.nodes[right].priority < self.nodes[smallest].priority)
-                {
-                    smallest = right;
-                }
+            if (right <= self.totalNodes and self.nodes[right].priority < self.nodes[smallest].priority) {
+                smallest = right;
+            }
 
             if (smallest == currentIndex) break;
 
@@ -96,36 +98,21 @@ pub const Heap = struct {
     }
 
     pub fn decreasePriority(self: *Heap, index: usize, newPriority: usize) !void {
-        var pos: usize = 0;
-
-        for (1..self.totalNodes + 1) |i| {
-            if (self.nodes[i].index == index) {
-                pos = i;
-                break;
-            }
-        }
-
-        if (pos == 0) return error.NodeNotInHeap;
-
+        const pos = self.index_map[index];
+        if (pos == 0 or pos > self.totalNodes) return error.NodeNotInHeap;
         if (newPriority >= self.nodes[pos].priority) return error.InvalidPriorityDecrease;
 
         self.nodes[pos].priority = newPriority;
 
         var currentIndex = pos;
-        var parentIndex = currentIndex / 2;
+        while (currentIndex > 1) {
+            const parentIndex = currentIndex / 2;
+            if (self.nodes[parentIndex].priority <= self.nodes[currentIndex].priority) break;
 
-        while (parentIndex != 0 and
-            self.nodes[parentIndex].priority > self.nodes[currentIndex].priority)
-        {
-            const temp = self.nodes[currentIndex];
-            self.nodes[currentIndex] = self.nodes[parentIndex];
-            self.nodes[parentIndex] = temp;
-
+            self.swapNodes(currentIndex, parentIndex);
             currentIndex = parentIndex;
-            parentIndex = currentIndex / 2;
         }
     }
-
 
     pub fn print(self: *Heap) void {
         if (self.totalNodes == 0) {
