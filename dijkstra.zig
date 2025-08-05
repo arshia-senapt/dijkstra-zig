@@ -9,61 +9,50 @@ pub fn dijkstra(myGraphOpt: ?graph.Graph, startNodeIndex: usize, endNodeIndex: u
     if (startNodeIndex < 1) return error.InvalidStartIndex;
     if (endNodeIndex > myGraph.maxSize) return error.InvalidEndIndex;
 
-    var i: usize = 1;
-    while (i <= myGraph.maxSize) : (i += 1) {
-        var node = &myGraph.nodes[i];
+    for (myGraph.nodes[1..myGraph.maxSize + 1]) |*node| {
         node.distanceFromStart = std.math.maxInt(usize);
         node.visited = false;
-        node.isInHeap = false;
         node.pathVia = 0;
     }
     myGraph.nodes[startNodeIndex].distanceFromStart = 0;
 
-    try heap.createHeap(&allocator, myGraph.maxSize);
+    var myHeap = try heap.Heap.init(&allocator, myGraph.maxSize);
+    defer myHeap.deinit();
 
-    try heap.addNode(startNodeIndex, 0);
-    myGraph.nodes[startNodeIndex].isInHeap = true;
-
-    const myHeap = heap.gHeap orelse return error.UninitializedHeap;
+    try myHeap.addNode(startNodeIndex, 0);
 
     while (myHeap.totalNodes > 0) {
-        const currentNode = try heap.removeTop();
-        const currentIndex = currentNode.index;
-        var currentNodeRef = &myGraph.nodes[currentIndex];
+        const current = try myHeap.removeTop();
+        const currentIndex = current.index;
+        const currentNode = &myGraph.nodes[currentIndex];
 
-        if (currentNodeRef.visited) continue;
+        if (currentNode.visited) continue;
+        currentNode.visited = true;
 
-        currentNodeRef.visited = true;
         if (currentIndex == endNodeIndex) break;
 
-        var children = currentNodeRef.children;
-        while (children) |child| {
-            const neighborIndex = child.index;
-            var neighborNode = &myGraph.nodes[neighborIndex];
-            if (neighborNode.visited) {
-                children = child.next;
-                continue;
-            }
+        var child = currentNode.children;
+        while (child) |c| : (child = c.next) {
+            const neighbor = &myGraph.nodes[c.index];
+            if (neighbor.visited) continue;
 
-            const newDistance = currentNodeRef.distanceFromStart + child.distance;
-            if (newDistance < neighborNode.distanceFromStart) {
-                neighborNode.distanceFromStart = newDistance;
-                neighborNode.pathVia = currentIndex;
-
-                if (neighborNode.isInHeap) {
-                    try heap.decreasePriority(neighborIndex, newDistance);
-                } else {
-                    try heap.addNode(neighborIndex, newDistance);
-                    neighborNode.isInHeap = true;
-                }
+            const newDist = currentNode.distanceFromStart + c.distance;
+            if (newDist < neighbor.distanceFromStart) {
+                neighbor.distanceFromStart = newDist;
+                neighbor.pathVia = currentIndex;
+                try myHeap.addNode(c.index, newDist);
             }
-            children = child.next;
         }
     }
 
     if (!myGraph.nodes[endNodeIndex].visited) {
-        std.debug.print("Node {d} ({s}) cannot be reached from Node {d} ({s})\n",
-            .{endNodeIndex, myGraph.nodes[endNodeIndex].name, startNodeIndex, myGraph.nodes[startNodeIndex].name});
+        std.debug.print(
+            "Node {d} ({s}) cannot be reached from Node {d} ({s})\n",
+            .{
+                endNodeIndex, myGraph.nodes[endNodeIndex].name,
+                startNodeIndex, myGraph.nodes[startNodeIndex].name
+            },
+        );
         return;
     }
 
@@ -88,5 +77,6 @@ pub fn dijkstra(myGraphOpt: ?graph.Graph, startNodeIndex: usize, endNodeIndex: u
             std.debug.print("\n", .{});
         }
     }
+
     std.debug.print("Total distance: {d}\n", .{myGraph.nodes[endNodeIndex].distanceFromStart});
 }
